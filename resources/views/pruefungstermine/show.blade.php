@@ -87,4 +87,10 @@
     </tbody>
   </table>
 </div>
+@php
+  $termin->loadMissing(['createdBy:id,name,Vorname,Nachname','updatedBy:id,name,Vorname,Nachname']);
+@endphp
+
+@include('partials.audit', ['model' => $termin])
+
 @endsection

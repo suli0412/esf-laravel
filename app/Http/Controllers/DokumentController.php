@@ -12,6 +12,10 @@ use App\Models\Teilnehmer;
 use App\Models\Projekt;
 use App\Models\Mitarbeiter;
 use App\Models\TeilnehmerProjekt;
+use App\Models\Gruppe;
+
+
+use Illuminate\Support\Facades\Log;
 
 class DokumentController extends Controller
 {
@@ -76,6 +80,77 @@ class DokumentController extends Controller
             'q_ma'                => $q_ma,
         ]);
     }
+
+    /** Kleine Hilfe: komplette Skala aus config/levels.php als String
+     *
+    private function scaleString(string $key): string
+    {
+        $levels = config("levels.$key", []);
+        $levels = array_values(array_unique(array_map('trim', $levels)));
+        return implode(', ', $levels);
+    }
+
+    */
+
+
+    private function pickLevel(Teilnehmer $t, string $outCol, string $inCol): string
+    {
+    $out = trim((string)($t->{$outCol} ?? ''));
+    if ($out !== '') return $out;
+
+    $in  = trim((string)($t->{$inCol} ?? ''));
+    return $in !== '' ? $in : '—';
+    }
+
+
+    /** Hilfsfunktion: baut alle Ersetzungs-Variablen für die Bestätigung */
+    private function certVars(Teilnehmer $t, ?Gruppe $g = null): array
+{
+    // Ort (Fallback)
+    $ort = trim((string)$t->Wohnort);
+    if ($ort === '') {
+        $ort = config('app.city') ?? config('org.city') ?? 'Graz';
+    }
+
+    $datum = now()->format('d.m.Y');
+
+    // Zeitraum aus Pivot
+    $von = $bis = '';
+    $pivot = $g
+        ? $t->gruppen()->where('gruppen.gruppe_id', $g->gruppe_id)->first()?->pivot
+        : $t->gruppen()->orderBy('gruppe_teilnehmer.beitritt_von')->first()?->pivot;
+
+    if ($pivot) {
+        $von = $pivot->beitritt_von ? \Illuminate\Support\Carbon::parse($pivot->beitritt_von)->format('d.m.Y') : '';
+        $bis = $pivot->beitritt_bis ? \Illuminate\Support\Carbon::parse($pivot->beitritt_bis)->format('d.m.Y') : '';
+    }
+
+    $projektName = $g->name ?? '';
+
+    // >>> HIER: tatsächliche Level (Austritt, sonst Eintritt)
+    $lesen     = $this->pickLevel($t, 'de_lesen_out',     'de_lesen_in');
+    $hoeren    = $this->pickLevel($t, 'de_hoeren_out',    'de_hoeren_in');
+    $schreiben = $this->pickLevel($t, 'de_schreiben_out', 'de_schreiben_in');
+    $sprechen  = $this->pickLevel($t, 'de_sprechen_out',  'de_sprechen_in');
+    $englisch  = $this->pickLevel($t, 'en_out',           'en_in');
+    $mathe     = $this->pickLevel($t, 'ma_out',           'ma_in');
+
+    return [
+        '{Ort}'               => $ort,
+        '{Datum}'             => $datum,
+        '{ZeitraumVon}'       => $von,
+        '{ZeitraumBis}'       => $bis,
+        '{ProjektName}'       => $projektName,
+
+        '{DeutschLesen}'      => $lesen,
+        '{DeutschHoeren}'     => $hoeren,
+        '{DeutschSchreiben}'  => $schreiben,
+        '{DeutschSprechen}'   => $sprechen,
+        '{EnglischNiveau}'    => $englisch,
+        '{MathematikNiveau}'  => $mathe,
+    ];
+}
+
 
     /**
      * Hilfsfunktion: nimm die erste existierende Spalte aus Kandidaten.
@@ -165,7 +240,6 @@ class DokumentController extends Controller
      */
     public function go(Request $request)
     {
-        // Tabellen-Namen sicher aus den Models holen
         $tblTn = (new Teilnehmer)->getTable();
         $tblPr = (new Projekt)->getTable();
         $tblMa = (new Mitarbeiter)->getTable();
@@ -175,7 +249,7 @@ class DokumentController extends Controller
             'teilnehmer_id' => ['required','integer', Rule::exists($tblTn, 'Teilnehmer_id')],
             'projekt_id'    => ['nullable','integer', Rule::exists($tblPr, 'projekt_id')],
             'mitarbeiter_id'=> ['nullable','integer', Rule::exists($tblMa, 'Mitarbeiter_id')],
-            'pdf'           => ['nullable'], // Checkbox
+            'pdf'           => ['nullable'],
         ]);
 
         $dokument    = Dokument::where('slug', $data['dokument_slug'])->firstOrFail();
@@ -183,8 +257,10 @@ class DokumentController extends Controller
         $projekt     = !empty($data['projekt_id'])     ? Projekt::find($data['projekt_id'])         : null;
         $mitarbeiter = !empty($data['mitarbeiter_id']) ? Mitarbeiter::find($data['mitarbeiter_id']) : null;
 
-        // Tokens
-        $tokens = $this->buildTokens($teilnehmer, $projekt, $mitarbeiter);
+        $wantsPdf = $request->boolean('pdf');
+
+        // Tokens (inkl. Skalen & Ort/Datum-Fallbacks)
+        $tokens = $this->buildTokens($teilnehmer, $projekt, $mitarbeiter, $wantsPdf);
 
         $replacements = [];
         foreach ($tokens as $k => $v) {
@@ -193,16 +269,12 @@ class DokumentController extends Controller
 
         $htmlBody = strtr($dokument->body ?? '', $replacements);
 
-        // PDF?
-        $wantsPdf = $request->boolean('pdf');
-
         if ($wantsPdf && class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             $wrapped = $this->wrapForPrint($htmlBody);
             $file    = 'Dokument_'.$dokument->slug.'_'.now()->format('Ymd_His').'.pdf';
             return \Barryvdh\DomPDF\Facade\Pdf::loadHTML($wrapped)->download($file);
         }
 
-        // Vorschau HTML
         return view('dokumente.render', [
             'html'        => $htmlBody,
             'title'       => $dokument->name,
@@ -211,40 +283,26 @@ class DokumentController extends Controller
         ]);
     }
 
-    /**
-     * Direkt-Render von /teilnehmer/{teilnehmer}/dokumente/{slug}
-     */
-    public function render(Teilnehmer $teilnehmer, string $slug, Request $request)
+    /** Beispiel: Render-Action, die die Tokens ersetzt */
+    public function render(Teilnehmer $teilnehmer, string $slug)
     {
-        $dokument = Dokument::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $dokument = Dokument::where('slug', $slug)->firstOrFail();
 
-        $projekt     = $request->filled('projekt_id')
-            ? Projekt::find($request->integer('projekt_id'))
-            : null;
-
-        $mitarbeiter = $request->filled('mitarbeiter_id')
-            ? Mitarbeiter::find($request->integer('mitarbeiter_id'))
-            : null;
-
-        $tokens = $this->buildTokens($teilnehmer, $projekt, $mitarbeiter);
-
-        $replacements = [];
-        foreach ($tokens as $k => $v) {
-            $replacements['{' . $k . '}'] = (string) $v;
+        // Gruppe optional
+        $gruppe = null;
+        if ($gid = request('gruppe_id')) {
+            $gruppe = Gruppe::find($gid);
+        } else {
+            $gruppe = $teilnehmer->gruppen()->first();
         }
 
-        $htmlBody = strtr($dokument->body ?? '', $replacements);
+        $raw  = $dokument->inhalt ?? $dokument->template ?? $dokument->body;
+        $text = strtr($raw, $this->certVars($teilnehmer, $gruppe));
 
-        return view('dokumente.render', [
-            'html'        => $htmlBody,
-            'title'       => $dokument->name,
-            'pdfAvailable'=> class_exists(\Barryvdh\DomPDF\Facade\Pdf::class),
-            'formPayload' => [
-                'dokument_slug' => $slug,
-                'teilnehmer_id' => $teilnehmer->Teilnehmer_id,
-                'projekt_id'    => $projekt?->projekt_id,
-                'mitarbeiter_id'=> $mitarbeiter?->Mitarbeiter_id,
-            ],
+        return view('dokumente.rendered', [
+            'text'      => $text,
+            'teilnehmer'=> $teilnehmer,
+            'dokument'  => $dokument,
         ]);
     }
 
@@ -264,40 +322,20 @@ class DokumentController extends Controller
         ));
     }
 
-    /**
-     * (Optional) PDF-Generierung mit gewähltem Projekt/Mitarbeiter.
-     */
-    public function generatePdf(Request $r, Teilnehmer $teilnehmer, Dokument $dokument)
+    /** Beispiel: PDF-Erzeugung – gleicher Trick vor dem PDF-Export */
+    public function generatePdf(Teilnehmer $teilnehmer, Dokument $dokument)
     {
-        if (!class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-            return back()->with('error', 'PDF-Paket ist nicht installiert.');
-        }
+        $gruppe = request('gruppe_id') ? Gruppe::find(request('gruppe_id')) : $teilnehmer->gruppen()->first();
+        $raw    = $dokument->inhalt ?? $dokument->template ?? $dokument->body;
+        $text   = strtr($raw, $this->certVars($teilnehmer, $gruppe));
 
-        $tblPr = (new Projekt)->getTable();
-        $tblMa = (new Mitarbeiter)->getTable();
-
-        $data = $r->validate([
-            'projekt_id'     => ['required','integer', Rule::exists($tblPr, 'projekt_id')],
-            'mitarbeiter_id' => ['nullable','integer', Rule::exists($tblMa, 'Mitarbeiter_id')],
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('dokumente.rendered', [
+            'text'       => $text,
+            'teilnehmer' => $teilnehmer,
+            'dokument'   => $dokument,
         ]);
 
-        $projekt = Projekt::findOrFail($data['projekt_id']);
-        $berater = $data['mitarbeiter_id'] ? Mitarbeiter::findOrFail($data['mitarbeiter_id']) : null;
-
-        // Zeitraum aus Pivot, Fallback auf Projekt
-        $tp = TeilnehmerProjekt::where('teilnehmer_id', $teilnehmer->Teilnehmer_id)
-                               ->where('projekt_id', $projekt->projekt_id)
-                               ->first();
-
-        $start = $tp?->beginn ?? $projekt->beginn ?? null;
-        $ende  = $tp?->ende   ?? $projekt->ende   ?? null;
-
-        $html = $this->renderForTeilnehmerUndProjekt($dokument, $teilnehmer, $projekt, $berater, $start, $ende);
-
-        $wrapped  = $this->wrapForPrint($html);
-        $filename = 'Dokument_'.$dokument->slug.'_'.$teilnehmer->Nachname.'_'.$teilnehmer->Vorname.'.pdf';
-
-        return \Barryvdh\DomPDF\Facade\Pdf::loadHTML($wrapped)->download($filename);
+        return $pdf->download(Str::slug($dokument->titel ?? 'bestaetigung').'.pdf');
     }
 
     /**
@@ -338,110 +376,106 @@ class DokumentController extends Controller
             '{MitarbeiterEmail}'     => $m?->Email ? e($m->Email) : '',
             '{MitarbeiterTelefon}'   => $m?->Telefonnummer ? e($m->Telefonnummer) : '',
 
-            // Ort/Datum
-            '{Ort}'           => e($t->Wohnort ?: 'Graz'),
+            // Ort/Datum (mit Fallback)
+            '{Ort}'           => e($t->Wohnort ?: (config('app.city') ?? config('org.city') ?? 'Graz')),
             '{Heute}'         => now()->format('d.m.Y'),
+            '{Datum}'         => now()->format('d.m.Y'),
         ];
 
         return strtr($doc->body, $map);
     }
 
     /**
-     * Universelle Tokens für go()/render().
-     * Deckt Person, Projekt, Mitarbeiter, Kenntnisse, Praktika & Logos ab.
+     * Universelle Tokens für go()/render(). Deckt Person, Projekt, Mitarbeiter,
+     * Kenntnisse, Praktika, Logos ab – PLUS Skalen + Datum/Ort-Fallback.
      */
-    protected function buildTokens(Teilnehmer $teilnehmer, ?Projekt $projekt = null, ?Mitarbeiter $mitarbeiter = null): array
+    protected function buildTokens(
+        Teilnehmer $teilnehmer,
+        ?Projekt $projekt = null,
+        ?Mitarbeiter $mitarbeiter = null,
+        bool $forPdf = false
+    ): array
     {
-        $fmtDate = function ($date, string $format = 'd.m.Y') {
-            if (!$date) return '';
-            try { return Carbon::parse($date)->format($format); }
-            catch (\Throwable $e) { return (string) $date; }
+       $fmtDate = function ($date, string $format = 'd.m.Y') {
+        if (!$date) return '';
+        try { return \Illuminate\Support\Carbon::parse($date)->format($format); }
+        catch (\Throwable $e) { return (string) $date; }
         };
         $n = fn($v) => $v ?? '';
 
-        // Kenntnisse (Relation optional)
-        $kenntnisse = method_exists($teilnehmer, 'kenntnisse')
-            ? optional($teilnehmer->kenntnisse)->first()
-            : null;
+        // Teilnehmer-Foto (relativ zu storage/app/public)
+        $fotoRel = $this->guessTeilnehmerPhotoPath($teilnehmer);
+        $teilnehmerFotoTag = '';
+        if ($fotoRel) {
+            if ($src = $this->imageSrcStorage($fotoRel, $forPdf)) {
+                $teilnehmerFotoTag = '<img src="'.$src.'" alt="Foto" style="max-height:90px;border-radius:6px;">';
+            }
+        }
 
-        // Praktika (Relation optional, dynamische Spalten!)
-        $prakTable = 'teilnehmer_praktika';
-        $colVon = 'beginn';
-        $colBis = 'ende';
-        $colStd = 'stunden_ausmass';
+        // Logos aus /public/images/*
+        $logo = fn(string $file, string $alt) =>
+            ($src = $this->imageSrcPublic('images/'.$file, $forPdf))
+                ? '<img src="'.$src.'" alt="'.$alt.'" style="max-height:60px;">'
+                : '';
 
-        $letztesPraktikum = method_exists($teilnehmer, 'praktika')
-            ? $teilnehmer->praktika()->orderByDesc($colVon)->first()
-            : null;
-
-        $praktikumStundenSumme = method_exists($teilnehmer, 'praktika')
-            ? (float) $teilnehmer->praktika()->sum($colStd)
-            : 0.0;
-
-        $prakVon = $letztesPraktikum?->$colVon;
-        $prakBis = $letztesPraktikum?->$colBis;
-        $prakStd = $letztesPraktikum?->$colStd;
+        // Fallbacks für Ort/Datum
+        $ortFallback = $teilnehmer->Wohnort
+            ?: ($projekt->ort ?? (config('app.city') ?? config('org.city') ?? 'Graz'));
+        $heute = now()->format('d.m.Y');
 
 
-        // Anrede (einfach)
-        $anrede = 'Sehr geehrte/r';
-        if (($teilnehmer->Geschlecht ?? null) === 'Frau') $anrede = 'Sehr geehrte Frau';
-        if (($teilnehmer->Geschlecht ?? null) === 'Mann') $anrede = 'Sehr geehrter Herr';
 
-        // Ort & Heute
-        $heute = now();
-        $ort   = $teilnehmer->Wohnort ?: ($projekt->ort ?? '');
+        // >>> tatsächliche Level (Austritt, sonst Eintritt)
+        $lesen     = $this->pickLevel($teilnehmer, 'de_lesen_out',     'de_lesen_in');
+        $hoeren    = $this->pickLevel($teilnehmer, 'de_hoeren_out',    'de_hoeren_in');
+        $schreiben = $this->pickLevel($teilnehmer, 'de_schreiben_out', 'de_schreiben_in');
+        $sprechen  = $this->pickLevel($teilnehmer, 'de_sprechen_out',  'de_sprechen_in');
+        $englisch  = $this->pickLevel($teilnehmer, 'en_out',           'en_in');
+        $mathe     = $this->pickLevel($teilnehmer, 'ma_out',           'ma_in');
 
-        // Logos (per Token direkt als <img>-Tag nutzbar)
-        $logoTag = fn($file, $alt) => '<img src="/images/'.$file.'" alt="'.$alt.'" style="max-height:60px;">';
 
         return [
             // Person
-            'Anrede'        => $anrede,
+            'Anrede'        => $this->anredeAusTeilnehmer($teilnehmer),
             'Vorname'       => $n($teilnehmer->Vorname),
             'Nachname'      => $n($teilnehmer->Nachname),
             'Geburtsdatum'  => $fmtDate($teilnehmer->Geburtsdatum),
 
             // Projekt
             'Projekt'       => $n(optional($projekt)->bezeichnung ?? ''),
+            'ProjektName'   => $n(optional($projekt)->bezeichnung ?? ''), // für {ProjektName}
             'ProjektBeginn' => $fmtDate(optional($projekt)->beginn ?? null),
             'ProjektEnde'   => $fmtDate(optional($projekt)->ende   ?? null),
 
             // Mitarbeiter
-            'MitarbeiterVorname' => $n(optional($mitarbeiter)->Vorname ?? ''),
-            'MitarbeiterNachname'=> $n(optional($mitarbeiter)->Nachname ?? ''),
+            'MitarbeiterVorname'  => $n(optional($mitarbeiter)->Vorname ?? ''),
+            'MitarbeiterNachname' => $n(optional($mitarbeiter)->Nachname ?? ''),
 
-            // Ort/Datum
-            'Ort'   => $n($ort),
-            'Heute' => $heute->format('d.m.Y'),
+            // Ort/Datum (inkl. {Datum})
+            'Ort'   => $n($ortFallback),
+            'Heute' => $heute,
+            'Datum' => $heute,
 
             // Logos / Bilder
-            'LogoTop'    => $logoTag('logo.jpg',       'Logo'),
-            'LogoBit'    => $logoTag('bit.jpg',        'bit'),
-            'LogoOecert' => $logoTag('oecert.jpg',     'oeCERT'),
-            'LogoOrg'    => $logoTag('org-photo.jpg',  'Organisation'),
-            'LogoEU'     => $logoTag('eu.jpg',         'EU'),
-            'LogoAMS'    => $logoTag('ams.jpg',        'AMS'),
+            'LogoTop'        => $logo('logo.jpg',      'Logo'),
+            'LogoBit'        => $logo('bit.jpg',       'bit'),
+            'LogoOecert'     => $logo('oecert.jpg',    'oeCERT'),
+            'LogoOrg'        => $logo('org-photo.jpg', 'Organisation'),
+            'LogoEU'         => $logo('eu.jpg',        'EU'),
+            'LogoAMS'        => $logo('ams.jpg',       'AMS'),
+            'TeilnehmerFoto' => $teilnehmerFotoTag,
 
-            // Kenntnisse (mehrere mögliche Spaltennamen tolerieren)
-            'DeutschLesen'     => $n($kenntnisse->DeutschLesen     ?? $kenntnisse->deutsch_lesen     ?? ''),
-            'DeutschHoeren'    => $n($kenntnisse->DeutschHoeren    ?? $kenntnisse->deutsch_hoeren    ?? ''),
-            'DeutschSchreiben' => $n($kenntnisse->DeutschSchreiben ?? $kenntnisse->deutsch_schreiben ?? ''),
-            'DeutschSprechen'  => $n($kenntnisse->DeutschSprechen  ?? $kenntnisse->deutsch_sprechen  ?? ''),
-            'EnglischNiveau'   => $n($kenntnisse->EnglischNiveau   ?? $kenntnisse->englisch          ?? ''),
-            'MathematikNiveau' => $n($kenntnisse->MathematikNiveau ?? $kenntnisse->mathematik        ?? ''),
+            // Tabellen
+            'PraktikaTabelleHtml'   => $this->renderPraktikaTable($teilnehmer),
+            'KenntnisseTabelleHtml' => $this->renderKenntnisseTable($teilnehmer),
 
-            // Praktikum – letztes + Summe (robust)
-            'PraktikumFirmaLetztes'   => $n($letztesPraktikum->firma   ?? $letztesPraktikum->Firma   ?? ''),
-            'PraktikumBereichLetztes' => $n($letztesPraktikum->bereich ?? $letztesPraktikum->Bereich ?? ''),
-            'PraktikumVonLetztes'     => $fmtDate($prakVon),
-            'PraktikumBisLetztes'     => $fmtDate($prakBis),
-            'PraktikumStundenLetztes' => $prakStd !== null ? number_format((float)$prakStd, 2, ',', '.') : '',
-            'PraktikumStundenSumme'   => number_format($praktikumStundenSumme, 2, ',', '.'),
-
-            // Tabellen als HTML für Vorlagen
-            'PraktikaTabelleHtml'     => $this->renderPraktikaTable($teilnehmer),
-            'KenntnisseTabelleHtml'   => $this->renderKenntnisseTable($teilnehmer),
+            // >>> Skalen (wichtig für deine Vorlage!)
+            'DeutschLesen'      => $lesen,
+            'DeutschHoeren'     => $hoeren,
+            'DeutschSchreiben'  => $schreiben,
+            'DeutschSprechen'   => $sprechen,
+            'EnglischNiveau'    => $englisch,
+            'MathematikNiveau'  => $mathe,
         ];
     }
 
@@ -455,7 +489,6 @@ class DokumentController extends Controller
             return '<p class="small">Keine Praktika vorhanden.</p>';
         }
 
-        // Primär: deine realen Spalten; Fallback: alte Varianten
         $colVon = Schema::hasColumn($table, 'beginn')
             ? 'beginn' : $this->pickCol($table, ['beginn_datum','von']);
         $colBis = Schema::hasColumn($table, 'ende')
@@ -485,7 +518,6 @@ class DokumentController extends Controller
     </thead><tbody>';
 
         foreach ($rows as $r) {
-            // Zeitraum formatieren (robust)
             $vonVal = $colVon ? ($r->$colVon ?? null) : null;
             $bisVal = $colBis ? ($r->$colBis ?? null) : null;
 
@@ -497,7 +529,6 @@ class DokumentController extends Controller
 
             $zeit = trim(($fmt($vonVal) ?: '').' – '.($fmt($bisVal) ?: ''));
 
-            // Stundenzahl (numeric & hübsch formatiert)
             $stdRaw = $colStd ? ($r->$colStd ?? null) : null;
             $stdOut = ($stdRaw !== null && $stdRaw !== '')
                 ? number_format((float)$stdRaw, 2, ',', '.')
@@ -516,9 +547,8 @@ class DokumentController extends Controller
         return $out;
     }
 
-
     /**
-     * (Optional) Kenntnisse als HTML-Tabelle (falls Spalten vorhanden).
+     * (Optional) Kenntnisse als HTML-Tabelle.
      */
     private function renderKenntnisseTable(Teilnehmer $tn): string
     {
@@ -562,9 +592,6 @@ class DokumentController extends Controller
         return $out;
     }
 
-    /**
-     * Anrede aus Geschlecht (kurz).
-     */
     private function anredeAusTeilnehmer(?Teilnehmer $tn): string
     {
         $g = mb_strtolower(trim((string)($tn?->Geschlecht ?? '')));
@@ -573,9 +600,6 @@ class DokumentController extends Controller
         return '';
     }
 
-    /**
-     * Wrapper für Druck/PDF.
-     */
     private function wrapForPrint(string $innerHtml): string
     {
         return <<<HTML
@@ -608,9 +632,6 @@ class DokumentController extends Controller
 HTML;
     }
 
-    /**
-     * Bild als data: URI einbetten (falls gewünscht).
-     */
     private function imgSrc(string $relPath): string
     {
         $path = public_path($relPath);
@@ -620,5 +641,52 @@ HTML;
         $mime = mime_content_type($path) ?: 'image/jpeg';
         $data = base64_encode(file_get_contents($path));
         return "data:$mime;base64,$data";
+    }
+
+    private function guessTeilnehmerPhotoPath(Teilnehmer $t): ?string
+    {
+        $candidates = [
+            'foto_pfad','photo_path','bild_pfad','avatar_path','foto','photo','bild','avatar'
+        ];
+        foreach ($candidates as $field) {
+            if (isset($t->$field) && is_string($t->$field) && $t->$field !== '') {
+                $v = ltrim($t->$field, '/');
+                $v = str_starts_with($v, 'storage/') ? substr($v, strlen('storage/')) : $v;
+                return $v; // Relativ zu storage/app/public
+            }
+        }
+        return null;
+    }
+
+    private function imageSrcPublic(string $publicRelativePath, bool $forPdf): ?string
+    {
+        $publicRelativePath = ltrim($publicRelativePath, '/');
+        $abs = public_path($publicRelativePath);
+
+        if (!is_file($abs)) return null;
+
+        if ($forPdf) {
+            $mime = mime_content_type($abs) ?: 'image/jpeg';
+            $data = base64_encode(file_get_contents($abs));
+            return "data:$mime;base64,$data";
+        }
+
+        return asset($publicRelativePath);
+    }
+
+    private function imageSrcStorage(string $storageRelativePath, bool $forPdf): ?string
+    {
+        $storageRelativePath = ltrim($storageRelativePath, '/');
+        $abs = storage_path('app/public/'.$storageRelativePath);
+
+        if (!is_file($abs)) return null;
+
+        if ($forPdf) {
+            $mime = mime_content_type($abs) ?: 'image/jpeg';
+            $data = base64_encode(file_get_contents($abs));
+            return "data:$mime;base64,$data";
+        }
+
+        return asset('storage/'.$storageRelativePath);
     }
 }

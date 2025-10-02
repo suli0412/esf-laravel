@@ -10,7 +10,7 @@ use Illuminate\Notifications\Notifiable;
 // Spatie-Package für Rollen & Berechtigungen
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, HasRoles;
 
@@ -24,11 +24,8 @@ class User extends Authenticatable
      * Mass-Assignment Schutz.
      * Wenn du alles freigeben willst: protected $guarded = [];
      */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
+     protected $fillable = ['name', 'email', 'password'];
+
 
     /**
      * Felder, die versteckt werden sollen (z. B. in Arrays/JSON).

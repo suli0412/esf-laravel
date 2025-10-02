@@ -1,53 +1,91 @@
 @extends('layouts.app')
+@section('title','Benutzerverwaltung')
 
 @section('content')
-    <h1 class="text-2xl font-semibold mb-4">User & Rollen</h1>
+<div class="flex items-center justify-between mb-6 gap-3">
+  <h1 class="text-2xl font-bold">Benutzer</h1>
 
-    @if(session('success'))
-        <div class="mb-4 rounded bg-green-100 p-3 text-green-800">{{ session('success') }}</div>
+  <form method="GET" class="flex items-end gap-2">
+    <div>
+      <label class="text-sm text-gray-600">Suche</label>
+      <input type="text" name="q" value="{{ $q }}" class="border rounded px-3 py-2" placeholder="Name oder E-Mail">
+    </div>
+    <button class="px-4 py-2 bg-gray-800 text-white rounded">Filtern</button>
+    @if($q)
+      <a href="{{ route('admin.users.index') }}" class="px-3 py-2 border rounded">Reset</a>
     @endif
+  </form>
 
-    {{-- Neuer User --}}
-    <div class="rounded-2xl border shadow p-4 mb-6">
-        <h2 class="font-semibold mb-3">Neuen User anlegen</h2>
-        <form method="POST" action="{{ route('admin.users.store') }}" class="grid md:grid-cols-4 gap-3">
-            @csrf
-            <input name="name" type="text" placeholder="Name" class="border rounded px-2 py-1" required>
-            <input name="email" type="email" placeholder="E-Mail" class="border rounded px-2 py-1" required>
-            <select name="roles[]" multiple size="3" class="border rounded px-2 py-1">
-                @foreach($roles as $r)
-                    <option value="{{ $r->name }}">{{ $r->name }}</option>
-                @endforeach
-            </select>
-            <button class="px-3 py-2 rounded bg-blue-600 text-white">Anlegen</button>
-        </form>
-        <p class="text-sm text-gray-500 mt-2">
-            Hinweis: Es wird ein zufälliges Temp-Passwort generiert und im Erfolgshinweis angezeigt.
-        </p>
-    </div>
+  @can('users.manage')
+    <a href="{{ route('admin.users.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded">+ Neuer Benutzer</a>
+  @endcan
+</div>
 
-    {{-- Bestehende User verwalten --}}
-    <div class="space-y-4">
-        @foreach($users as $u)
-            <div class="rounded-2xl shadow p-4 border">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <div class="font-medium">{{ $u->name ?? $u->email }}</div>
-                        <div class="text-sm text-gray-500">
-                            Rollen: {{ $u->roles->pluck('name')->join(', ') ?: '—' }}
-                        </div>
-                    </div>
-                    <form method="POST" action="{{ route('admin.users.roles.update', $u) }}" class="flex items-center gap-3">
-                        @csrf
-                        <select name="roles[]" multiple size="4" class="border rounded px-2 py-1 min-w-64">
-                            @foreach($roles as $r)
-                                <option value="{{ $r->name }}" @selected($u->hasRole($r->name))>{{ $r->name }}</option>
-                            @endforeach
-                        </select>
-                        <button class="px-3 py-2 rounded bg-blue-600 text-white">Speichern</button>
-                    </form>
+@if(session('success'))
+  <div class="mb-4 rounded border bg-green-50 text-green-800 px-3 py-2">{{ session('success') }}</div>
+@endif
+@if(session('error'))
+  <div class="mb-4 rounded border bg-red-50 text-red-800 px-3 py-2">{{ session('error') }}</div>
+@endif
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+  <table class="w-full text-left">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="px-3 py-2">Name</th>
+        <th class="px-3 py-2">E-Mail</th>
+        <th class="px-3 py-2">Rollen</th>
+        <th class="px-3 py-2 w-56">Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      @forelse($users as $u)
+        <tr class="border-t">
+          <td class="px-3 py-2">{{ $u->name }}</td>
+          <td class="px-3 py-2">{{ $u->email }}</td>
+          <td class="px-3 py-2">
+            @forelse($u->roles as $r)
+              <span class="inline-block px-2 py-0.5 text-xs rounded bg-gray-100 border mr-1">{{ $r->name }}</span>
+            @empty
+              <span class="text-gray-400">—</span>
+            @endforelse
+          </td>
+          <td class="px-3 py-2">
+            <div class="flex items-center gap-3">
+              @can('users.manage')
+                <a href="{{ route('admin.users.edit', $u) }}" class="text-blue-700 hover:underline">Bearbeiten</a>
+                <div>
                 </div>
+                <div>
+                </div>
+                <form action="{{ route('admin.users.sendReset', $u) }}" method="POST" onsubmit="return confirm('Reset-Link an {{ $u->email }} senden?')">
+                  @csrf
+                  <button class="text-indigo-700 hover:underline" type="submit">Reset-Link</button>
+                </form>
+                <div>
+                </div>
+                <div>
+                </div>
+                <div>
+                </div>
+                <div>
+                </div>
+                @if(auth()->id() !== $u->id)
+                  <form action="{{ route('admin.users.destroy', $u) }}" method="POST" onsubmit="return confirm('Diesen Benutzer löschen?')">
+                    @csrf @method('DELETE')
+                    <button class="text-red-700 hover:underline" type="submit">Löschen</button>
+                  </form>
+                @endif
+              @endcan
             </div>
-        @endforeach
-    </div>
+          </td>
+        </tr>
+      @empty
+        <tr><td class="px-3 py-6 text-gray-500" colspan="4">Keine Benutzer gefunden.</td></tr>
+      @endforelse
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-4">{{ $users->links() }}</div>
 @endsection

@@ -32,6 +32,8 @@
                 </div>
             </div>
 
+        </div>
+    </div>
             {{-- Nächste Prüfungstermine --}}
             <div class="rounded-2xl border bg-white p-5">
                 <div class="flex items-center justify-between">

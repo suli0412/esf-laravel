@@ -3,30 +3,46 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
+
 
 class Kompetenzstand extends Model
 {
     protected $table = 'kompetenzstand';
-    public $timestamps = false;
-    protected $primaryKey = null; // Composite PK
-    public $incrementing = false;
+    protected $fillable = ['teilnehmer_id','kompetenz_id','niveau_id','zeitpunkt','datum','bemerkung'];
 
-    protected $fillable = [
-        'teilnehmer_id','zeitpunkt','kompetenz_id','niveau_id','datum','bemerkung'
-    ];
-
-    public function teilnehmer()
+    // Mutator: beim Speichern normalisieren
+    public function setZeitpunktAttribute($value)
     {
-        return $this->belongsTo(Teilnehmer::class, 'teilnehmer_id', 'Teilnehmer_id');
+        $norm = strtolower(trim((string)$value));
+        // akzeptiere Varianten
+        $map = ['eintritt' => 'eintritt', 'austritt' => 'austritt'];
+        $this->attributes['zeitpunkt'] = $map[$norm] ?? $norm;
     }
 
-    public function kompetenz()
+    // Accessor: sicheres, genormtes Feld
+    public function getZeitpunktNormAttribute(): string
     {
-        return $this->belongsTo(Kompetenz::class, 'kompetenz_id', 'kompetenz_id');
+        return strtolower(trim((string)($this->attributes['zeitpunkt'] ?? '')));
     }
 
-    public function niveau()
+
+
+
+    // Scopes
+        public function scopeEintritt(Builder $q): Builder
     {
-        return $this->belongsTo(Niveau::class, 'niveau_id', 'niveau_id');
+        return Schema::hasColumn('kompetenzstand', 'zeitpunkt_norm')
+            ? $q->where('zeitpunkt_norm', 'eintritt')
+            : $q->whereRaw('LOWER(TRIM(zeitpunkt)) = ?', ['eintritt']);
     }
+
+    public function scopeAustritt(Builder $q): Builder
+    {
+        return Schema::hasColumn('kompetenzstand', 'zeitpunkt_norm')
+            ? $q->where('zeitpunkt_norm', 'austritt')
+            : $q->whereRaw('LOWER(TRIM(zeitpunkt)) = ?', ['austritt']);
+    }
+
 }

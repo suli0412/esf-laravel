@@ -127,6 +127,13 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'activity' => [
+            'driver' => 'daily', // oder 'single'
+            'path'   => storage_path('logs/activity.log'),
+            'level'  => 'info',
+            'days'   => 14,      // nur bei 'daily' relevant
+        ],
+
     ],
 
 ];

@@ -5,44 +5,57 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
+use App\Models\User;
 
 class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        // Cache leeren (wichtig bei wiederholtem Seeden)
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // --- Permissions (nach Modulen gruppiert) ---
-        $perms = [
+        $permissions = [
             // Teilnehmer
             'teilnehmer.view', 'teilnehmer.create', 'teilnehmer.update', 'teilnehmer.delete',
+
             // Dokumente
             'dokumente.view', 'dokumente.upload', 'dokumente.delete',
+
             // Gruppen
             'gruppen.view', 'gruppen.manage',
+
             // Beratung
             'beratung.view', 'beratung.manage',
+
             // Praktikum
             'praktikum.view', 'praktikum.manage',
+
             // Anwesenheit
             'anwesenheit.view', 'anwesenheit.manage',
+
             // Reports / Einstellungen
             'reports.view', 'settings.manage',
+
             // User/Rollen-Admin
             'users.view', 'users.manage', 'roles.manage',
+
+            // Aktivitäts- / Audit-Log (für den Logs-Button)
+            'activity.view',
         ];
 
-        foreach ($perms as $p) {
-            Permission::firstOrCreate(['name' => $p]);
+        foreach ($permissions as $p) {
+            Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
         }
 
-        // --- Rollen ---
-        $admin       = Role::firstOrCreate(['name' => 'Admin']);
-        $mitarbeiter = Role::firstOrCreate(['name' => 'Mitarbeiter']);
-        $coach       = Role::firstOrCreate(['name' => 'Coach']);
-        $gast        = Role::firstOrCreate(['name' => 'Gast']);
+        // --- Rollen  ---
+        $admin       = Role::firstOrCreate(['name' => 'admin',       'guard_name' => 'web']);
+        $mitarbeiter = Role::firstOrCreate(['name' => 'mitarbeiter', 'guard_name' => 'web']);
+        $coach       = Role::firstOrCreate(['name' => 'coach',       'guard_name' => 'web']);
+        $gast        = Role::firstOrCreate(['name' => 'gast',        'guard_name' => 'web']);
 
-        // Admin bekommt alles
+        // Admin bekommt ALLE Berechtigungen
         $admin->syncPermissions(Permission::all());
 
         // Mitarbeiter – typische Schreibrechte im Tagesgeschäft
@@ -55,7 +68,7 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
         ]);
 
-        // Coach – eher lesend + ggf. Beratung/Praktikum verwalten
+        // Coach – eher lesend + Beratung/Praktikum verwalten
         $coach->syncPermissions([
             'teilnehmer.view',
             'dokumente.view',
@@ -70,5 +83,15 @@ class RolePermissionSeeder extends Seeder
             'dokumente.view',
             'reports.view',
         ]);
+
+        //  User zum Admin machen
+        if ($firstUser = User::query()->orderBy('id')->first()) {
+            if (!$firstUser->hasRole('admin')) {
+                $firstUser->assignRole('admin');
+            }
+        }
+
+        // Cache erneut leeren
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

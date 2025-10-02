@@ -28,6 +28,11 @@ class DashboardController extends Controller
             'projekte'   => Projekt::count(),
         ];
 
+         $projekte = Projekt::orderByDesc('aktiv')
+                ->orderBy('bezeichnung')
+                ->limit(5)
+                ->get();
+
         // Nächste Prüfungstermine (max 4)
         $nextPruef = Pruefungstermin::query()
             ->whereDate('datum', '>=', $today)
@@ -100,6 +105,6 @@ class DashboardController extends Controller
         $user = auth()->user();
         $isAdmin = $user && method_exists($user, 'hasRole') ? $user->hasRole('admin') : false;
 
-        return view('dashboard', compact('counts','nextPruef','recent','anwToday','anwWeek','isAdmin'));
+        return view('dashboard', compact('counts','nextPruef','recent','anwToday','anwWeek','isAdmin','projekte'));
     }
 }

@@ -1,52 +1,55 @@
-<x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
-        @csrf
+@extends('layouts.guest')
+@section('title','Registrieren')
 
-        <!-- Name -->
+@section('content')
+  <div class="rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-1">Konto erstellen</h1>
+    <p class="text-slate-500 mb-6">Schnell & unkompliziert.</p>
+
+    @if ($errors->any())
+      <div class="mb-4 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 px-3 py-2">
+        Bitte Eingaben prüfen.
+      </div>
+    @endif
+
+    <form method="POST" action="{{ route('register') }}" class="space-y-4">
+      @csrf
+      <div>
+        <label class="block text-sm mb-1">Name</label>
+        <input name="name" value="{{ old('name') }}" required
+               class="w-full rounded-lg border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+        @error('name')<p class="text-xs text-rose-600 mt-1">{{ $message }}</p>@enderror
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
         <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+          <label class="block text-sm mb-1">E-Mail</label>
+          <input type="email" name="email" value="{{ old('email') }}" required
+                 class="w-full rounded-lg border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+          @error('email')<p class="text-xs text-rose-600 mt-1">{{ $message }}</p>@enderror
         </div>
-
-        <!-- Email Address -->
-        <div class="mt-4">
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        <div>
+          <label class="block text-sm mb-1">Passwort</label>
+          <input type="password" name="password" required
+                 class="w-full rounded-lg border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+          @error('password')<p class="text-xs text-rose-600 mt-1">{{ $message }}</p>@enderror
         </div>
+      </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+      <div>
+        <label class="block text-sm mb-1">Passwort bestätigen</label>
+        <input type="password" name="password_confirmation" required
+               class="w-full rounded-lg border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+      </div>
 
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                            type="password"
-                            name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('login') }}">
-                {{ __('Already registered?') }}
-            </a>
-
-            <x-primary-button class="ms-4">
-                {{ __('Register') }}
-            </x-primary-button>
-        </div>
+      <button class="w-full rounded-lg bg-slate-900 text-white py-2.5 hover:bg-black">
+        Registrieren
+      </button>
     </form>
-</x-guest-layout>
+
+    <p class="text-xs text-slate-500 mt-6 text-center">
+      Bereits registriert?
+      <a href="{{ route('login') }}" class="text-indigo-600 hover:underline">Zum Login</a>
+    </p>
+  </div>
+@endsection

@@ -36,12 +36,16 @@
   {{-- =========================
        Niveaus – EINTRITT
      ========================= --}}
+
   <div class="bg-white rounded-xl shadow-sm p-6">
     <h3 class="text-base font-semibold mb-4">Niveau bei <span class="font-bold">Eintritt</span></h3>
-
+        <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="prune_missing" value="1">Fehlende Kompetenzen entfernen (nicht gesetzte Einträge löschen)
+        </label>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {{-- Deutsch --}}
-      <div>
+
+        {{-- Deutsch --}}
+       <div>
         <label for="de_lesen_in" class="block text-sm font-medium mb-1">Deutsch: Leseverstehen</label>
         <select id="de_lesen_in" name="de_lesen_in" class="border rounded-lg w-full px-3 py-2">
           <option value="">— bitte wählen —</option>

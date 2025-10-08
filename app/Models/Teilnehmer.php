@@ -4,21 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\Traits\LogsActivity;      // LogsActivity
-use Spatie\Activitylog\Models\Activity;          // Activity Model
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\LogOptions;
 use App\Models\Traits\Blameable;
 
 class Teilnehmer extends Model
 {
-    use HasFactory, LogsActivity;
-     use Blameable;
+    use HasFactory, LogsActivity, Blameable;
 
     protected $table = 'teilnehmer';
-    protected $primaryKey = 'Teilnehmer_id';
-    public $incrementing = true;
-    protected $keyType = 'int';
 
+    // WICHTIG: Primärschlüssel ist "Teilnehmer_id"
+    protected $primaryKey = 'Teilnehmer_id';
+    public $incrementing = true;   // passt zu deinem Schema
+    protected $keyType = 'int';
 
     public $timestamps = true;
 
@@ -32,8 +32,10 @@ class Teilnehmer extends Model
         'Berufserfahrung_als','Bereich_berufserfahrung','Land_berufserfahrung','Firma_berufserfahrung',
         'Zeit_berufserfahrung','Stundenumfang_berufserfahrung','Zertifikate',
         'Berufswunsch','Berufswunsch_branche','Berufswunsch_branche2',
-        'Clearing_gruppe','Unterrichtseinheiten','Anmerkung','gruppe_id','de_lesen_in','de_hoeren_in','de_schreiben_in','de_sprechen_in','en_in','ma_in',
-    'de_lesen_out','de_hoeren_out','de_schreiben_out','de_sprechen_out','en_out','ma_out'
+        'Clearing_gruppe','Unterrichtseinheiten','Anmerkung','gruppe_id',
+        // Kompetenzstände-Übernahmefelder am Teilnehmer
+        'de_lesen_in','de_hoeren_in','de_schreiben_in','de_sprechen_in','en_in','ma_in',
+        'de_lesen_out','de_hoeren_out','de_schreiben_out','de_sprechen_out','en_out','ma_out',
     ];
 
     protected $casts = [
@@ -50,29 +52,24 @@ class Teilnehmer extends Model
         'Geburtsdatum' => 'date:Y-m-d',
     ];
 
-
-
-    /** ---------- Activitylog-Konfiguration ---------- */
+    /** ---------- Activitylog ---------- */
     protected static $recordEvents = ['created','updated','deleted'];
     protected static $logName = 'teilnehmer';
-    protected static $logAttributes = ['*'];     // alle Felder loggen
-    protected static $logOnlyDirty = true;       // nur Veränderungen
+    protected static $logAttributes = ['*'];
+    protected static $logOnlyDirty = true;
     protected static $submitEmptyLogs = false;
-    protected static $logAttributesToIgnore = [
-        // z. B. große/sensible Felder hier eintragen (falls nötig)
-        // 'some_big_text_column',
-    ];
+    protected static $logAttributesToIgnore = [];
 
     public function creator() { return $this->belongsTo(User::class, 'created_by'); }
     public function updater() { return $this->belongsTo(User::class, 'updated_by'); }
 
     public function getActivitylogOptions(): LogOptions
     {
-    return LogOptions::defaults()
-        ->useLogName('teilnehmer')
-        ->logAll()              // alle Attribute
-        ->logOnlyDirty()        // nur Änderungen
-        ->dontSubmitEmptyLogs();// keine leeren Logs
+        return LogOptions::defaults()
+            ->useLogName('teilnehmer')
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 
     public function getDescriptionForEvent(string $eventName): string
@@ -82,7 +79,6 @@ class Teilnehmer extends Model
 
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        // bei CLI/Seeder/Migration keine Request-Daten anhängen
         if (app()->runningInConsole()) return;
 
         $activity->properties = $activity->properties->merge([
@@ -99,6 +95,7 @@ class Teilnehmer extends Model
         return $this->hasOne(ChecklisteNermin::class, 'Teilnehmer_id', 'Teilnehmer_id');
     }
 
+    // Damit Route Model Binding mit {teilnehmer:Teilnehmer_id} funktioniert
     public function getRouteKeyName(): string
     {
         return 'Teilnehmer_id';
@@ -106,10 +103,9 @@ class Teilnehmer extends Model
 
     public function beratungen()
     {
-        return $this->hasMany(\App\Models\Beratung::class, 'teilnehmer_id', 'Teilnehmer_id')
+        return $this->hasMany(Beratung::class, 'teilnehmer_id', 'Teilnehmer_id')
                     ->orderBy('datum','desc');
     }
-
 
     public function gruppenBeratungen()
     {
@@ -133,12 +129,12 @@ class Teilnehmer extends Model
 
     public function anwesenheiten()
     {
-        return $this->hasMany(\App\Models\TeilnehmerAnwesenheit::class, 'teilnehmer_id', 'Teilnehmer_id');
+        return $this->hasMany(TeilnehmerAnwesenheit::class, 'teilnehmer_id', 'Teilnehmer_id');
     }
 
     public function teilnehmerProjekte()
     {
-        return $this->hasMany(\App\Models\TeilnehmerProjekt::class, 'teilnehmer_id', 'Teilnehmer_id')
+        return $this->hasMany(TeilnehmerProjekt::class, 'teilnehmer_id', 'Teilnehmer_id')
                     ->with('projekt');
     }
 
@@ -149,15 +145,13 @@ class Teilnehmer extends Model
 
     public function dokumente()
     {
-        return $this->hasMany(\App\Models\TeilnehmerDokument::class, 'teilnehmer_id', 'Teilnehmer_id');
+        return $this->hasMany(TeilnehmerDokument::class, 'teilnehmer_id', 'Teilnehmer_id');
     }
-
 
     public function gruppe()
     {
-        return $this->belongsTo(\App\Models\Gruppe::class, 'gruppe_id', 'gruppe_id');
+        return $this->belongsTo(Gruppe::class, 'gruppe_id', 'gruppe_id');
     }
-
 
     public function praktika()
     {
@@ -171,21 +165,32 @@ class Teilnehmer extends Model
         return trim(($this->Vorname ?? '').' '.($this->Nachname ?? ''));
     }
 
-    // Kompetenzstände
-    public function kompetenzstaende() {
-        return $this->hasMany(\App\Models\Kompetenzstand::class, 'teilnehmer_id', 'Teilnehmer_id');
-    }
-    public function kompetenzstandEintritt() {
-        return $this->kompetenzstaende()->where('zeitpunkt','Eintritt');
-    }
-    public function kompetenzstandAustritt() {
-        return $this->kompetenzstaende()->where('zeitpunkt','Austritt');
+    /** ---------- Kompetenzstände ---------- */
+    public function kompetenzstaende()
+    {
+        // FK in kompetenzstand = teilnehmer_id, lokaler Key in teilnehmer = Teilnehmer_id
+        return $this->hasMany(Kompetenzstand::class, 'teilnehmer_id', 'Teilnehmer_id');
     }
 
-    // Prüfungs-Teilnahmen
-    public function pruefungstermine() {
-        return $this->belongsToMany(\App\Models\Pruefungstermin::class, 'Pruefungsteilnahme',
-            'teilnehmer_id', 'termin_id')->withPivot(['bestanden','selbstzahler']);
+    public function kompetenzstandEintritt()
+    {
+        return $this->kompetenzstaende()->where('zeitpunkt_norm', 'eintritt');
+    }
+
+    public function kompetenzstandAustritt()
+    {
+        return $this->kompetenzstaende()->where('zeitpunkt_norm', 'austritt');
+    }
+
+    /** ---------- Prüfungs-Teilnahmen ---------- */
+    public function pruefungstermine()
+    {
+        return $this->belongsToMany(
+            Pruefungstermin::class,
+            'Pruefungsteilnahme',
+            'teilnehmer_id',
+            'termin_id'
+        )->withPivot(['bestanden','selbstzahler']);
     }
 
     public function createdBy()

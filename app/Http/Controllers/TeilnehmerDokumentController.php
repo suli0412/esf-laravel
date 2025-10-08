@@ -63,12 +63,21 @@ public function store(Request $r, \App\Models\Teilnehmer $teilnehmer)
     }
 
     /** Datei herunterladen */
-    public function download(TeilnehmerDokument $dokument): StreamedResponse
+    public function download(Teilnehmer $teilnehmer, TeilnehmerDokument $dokument): StreamedResponse
     {
-        return Storage::disk('public')->download(
-            $dokument->dokument_pfad,
-            $dokument->original_name ?: basename($dokument->dokument_pfad)
-        );
+    // Sicherheitscheck: Dokument gehört zum Teilnehmer
+    if ((int) $dokument->teilnehmer_id !== (int) $teilnehmer->Teilnehmer_id) {
+        abort(404); // oder abort(403) je nach Policy
+    }
+
+    $path = $dokument->dokument_pfad;
+    $filename = $dokument->original_name ?: basename($path);
+
+    if (!Storage::disk('public')->exists($path)) {
+        abort(404, 'Datei nicht gefunden.');
+    }
+
+    return Storage::disk('public')->download($path, $filename);
     }
 
     /** Datei löschen */

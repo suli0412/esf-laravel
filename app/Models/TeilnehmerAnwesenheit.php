@@ -49,6 +49,69 @@ class TeilnehmerAnwesenheit extends Model
         // ggf. Felder ausschließen
     ];
 
+     protected static function booted(): void
+    {
+        static::created(function (self $m) {
+            activity('beratung')
+                ->performedOn($m)
+                ->causedBy(auth()->user())
+                ->event('created')
+                ->withProperties([
+                    'ip'   => request()->ip(),
+                    'url'  => request()->fullUrl(),
+                    'route'=> optional(request()->route())->getName(),
+                    'attributes' => [
+                        'anwesenheit_id' => $m->anwesenheit_id,
+                        'teilnehmer_id'  => $m->teilnehmer_id,
+                        'datum'          => $m->datum,
+                        'status'         => $m->status,
+                        'fehlminuten'    => (int) $m->fehlminuten,
+                        'created_at'     => now(),
+                        'created_by'     => auth()->id(),
+                    ],
+                    'user_agent' => request()->userAgent(),
+                ])
+                ->log('Anwesenheit erfasst');
+        });
+
+        static::updated(function (self $m) {
+            activity('beratung')
+                ->performedOn($m)
+                ->causedBy(auth()->user())
+                ->event('updated')
+                ->withProperties([
+                    'ip'   => request()->ip(),
+                    'url'  => request()->fullUrl(),
+                    'route'=> optional(request()->route())->getName(),
+                    'changes' => [
+                        'old' => $m->getOriginal(),
+                        'new' => $m->getChanges(),
+                    ],
+                ])
+                ->log('Anwesenheit geändert');
+        });
+
+        static::deleted(function (self $m) {
+            activity('beratung')
+                ->performedOn($m)
+                ->causedBy(auth()->user())
+                ->event('deleted')
+                ->withProperties([
+                    'ip'   => request()->ip(),
+                    'url'  => request()->fullUrl(),
+                    'route'=> optional(request()->route())->getName(),
+                    'attributes' => [
+                        'anwesenheit_id' => $m->anwesenheit_id,
+                        'teilnehmer_id'  => $m->teilnehmer_id,
+                        'datum'          => $m->datum,
+                        'status'         => $m->status,
+                    ],
+                ])
+                ->log('Anwesenheit gelöscht');
+        });
+    }
+
+
     public function getActivitylogOptions(): LogOptions
     {
     return LogOptions::defaults()
@@ -60,8 +123,14 @@ class TeilnehmerAnwesenheit extends Model
 
     public function getDescriptionForEvent(string $eventName): string
     {
-        return "Anwesenheit {$eventName}";
+    return match ($eventName) {
+        'created' => 'Anwesenheit erfasst',
+        'updated' => 'Anwesenheit geändert',
+        'deleted' => 'Anwesenheit gelöscht',
+        default   => 'Anwesenheit '.$eventName,
+    };
     }
+
 
     public function tapActivity(Activity $activity, string $eventName): void
     {

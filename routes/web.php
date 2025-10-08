@@ -10,7 +10,7 @@ use App\Http\Controllers\Admin\NiveauController as AdminNiveauController;
 use App\Http\Controllers\Admin\PruefungsterminController as AdminPruefungsterminController;
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\Admin\ActivityLogController;
-
+use App\Http\Controllers\KompetenzstandController;
 // App-Controller
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TeilnehmerController;
@@ -163,31 +163,27 @@ Route::prefix('admin')
         // Protokolle / Logs
         // =========================
         // Achtung: Controller umgestellt auf Admin\LogController (neue Implementation)
-        Route::get('logs', [\App\Http\Controllers\Admin\LogController::class, 'index'])
+        // Logs-Controller konsistent zum Import
+        Route::get('logs', [ActivityLogController::class, 'index'])
             ->name('logs.index')
             ->middleware('permission:audit.view');
 
+        // Stammdaten
+        Route::resource('kompetenzen', AdminKompetenzController::class)
+        ->parameters(['kompetenzen' => 'kompetenz']);
 
-        // =========================
-        // Stammdaten (Kompetenzen, Niveaus)
-        // =========================
-        Route::resource('kompetenzen', \App\Http\Controllers\Admin\AdminKompetenzController::class)
+
+        Route::resource('niveaus', AdminNiveauController::class)
             ->except(['show'])
             ->middleware('permission:settings.manage');
 
-        Route::resource('niveaus', \App\Http\Controllers\Admin\AdminNiveauController::class)
-            ->except(['show'])
-            ->middleware('permission:settings.manage');
-
-
-        // =========================
         // Prüfungstermine (Admin)
-        // =========================
-        Route::resource('pruefungstermine', \App\Http\Controllers\Admin\AdminPruefungsterminController::class);
+        Route::resource('pruefungstermine', AdminPruefungsterminController::class);
 
-        Route::post('pruefungstermine/{termin}/buchen', [\App\Http\Controllers\Admin\AdminPruefungsterminController::class, 'buchen'])
+        Route::post('pruefungstermine/{termin}/buchen', [AdminPruefungsterminController::class, 'buchen'])
             ->name('pruefungstermine.buchen');
-    });
+
+            });
 
 
 
@@ -199,3 +195,18 @@ Route::post  ('gruppen-beratungen/{session}/teilnehmer', [GruppenBeratungControl
 Route::delete('gruppen-beratungen/{session}/teilnehmer/{teilnehmer}', [GruppenBeratungController::class, 'detachTeilnehmer'])
     ->name('gruppen_beratungen.teilnehmer.detach')
     ->middleware(['auth','permission:beratung.manage']);
+
+    Route::middleware(['auth']) // ggf. erweitern: 'permission:teilnehmer.edit'
+    ->post('/teilnehmer/{teilnehmer}/kompetenzen/demo', [TeilnehmerController::class, 'setDemoKompetenzen'])
+    ->name('teilnehmer.demoKompetenzen');
+
+
+// routes/web.php
+Route::post('/teilnehmer/{teilnehmer}/kompetenzstand', [\App\Http\Controllers\KompetenzstandController::class, 'store'])
+    ->name('kompetenzstand.store'); // lassen, falls du noch Einzel-Speichern nutzt
+Route::post('/teilnehmer/{teilnehmer}/kompetenzen/bulk', [KompetenzstandController::class, 'bulkFromKompetenzForm'])
+    ->name('kompetenz.bulkForm');
+
+
+
+

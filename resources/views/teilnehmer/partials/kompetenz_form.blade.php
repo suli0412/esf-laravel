@@ -3,6 +3,7 @@
   $eintrittMap = $eintrittMap ?? [];
   $austrittMap = $austrittMap ?? [];
 @endphp
+
 @php
   // bereits gesetzte Werte mappen: [zeitpunkt][kompetenz_id] => niveau_id
   $set = ['Eintritt'=>[], 'Austritt'=>[]];
@@ -13,7 +14,15 @@
   }
 @endphp
 
-<div class="bg-white rounded-xl shadow-sm p-6">
+{{-- Wenn $teilnehmer existiert (Edit-Seite), machen wir ein eigenes Formular nur für Kompetenzen.
+     Wenn NICHT (Create-Seite), lassen wir die Felder ohne Form-Tag, damit sie mit dem Haupt-Formular gesendet werden. --}}
+@if(isset($teilnehmer))
+  <form method="POST" action="{{ route('kompetenz.bulkForm', $teilnehmer) }}" class="bg-white rounded-xl shadow-sm p-6">
+    @csrf
+@else
+  <div class="bg-white rounded-xl shadow-sm p-6">
+@endif
+
   <h3 class="text-lg font-semibold mb-4">Kompetenzstand</h3>
 
   <div class="grid grid-cols-3 gap-3 items-end mb-3">
@@ -81,4 +90,17 @@
              value="{{ old('kompetenz.bemerkung.Austritt') }}">
     </div>
   </div>
-</div>
+
+  @if(isset($teilnehmer))
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+        Speichern
+      </button>
+    </div>
+  @endif
+
+@if(isset($teilnehmer))
+  </form>
+@else
+  </div>
+@endif

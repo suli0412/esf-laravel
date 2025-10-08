@@ -10,6 +10,10 @@
         try { return \Illuminate\Support\Carbon::parse($val)->format('d.m.Y'); }
         catch (\Throwable $e) { return '—'; }
     };
+    // 0/1, "0"/"1", true/false -> "Ja"/"Nein"; null/"" -> "—"
+    $yesNo = function ($v) {
+        return is_null($v) || $v === '' ? '—' : ((int) $v === 1 ? 'Ja' : 'Nein');
+    };
 @endphp
 
 {{-- Kopf --}}
@@ -56,10 +60,6 @@
   </div>
 </div>
 
-
-
-
-
 {{-- 2-Spalten-Layout --}}
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -96,18 +96,18 @@
           </div>
         </div>
 
-        <div><span class="text-gray-500">Telefon</span><div>{{ $teilnehmer->Telefonnummer ?: '—' }}</div></div>
+        <div><span class="text-gray-500">Telefon</span><div>{{ $teilnehmer->Telefon ?? $teilnehmer->Telefonnummer ?? '—' }}</div></div>
         <div><span class="text-gray-500">Geburtsdatum</span><div>{{ $fmt($teilnehmer->Geburtsdatum) }}</div></div>
         <div><span class="text-gray-500">Geburtsland</span><div>{{ $teilnehmer->Geburtsland ?: '—' }}</div></div>
-        <div><span class="text-gray-500">Staatszugehörigkeit</span><div>{{ $teilnehmer->Staatszugehörigkeit ?: '—' }}</div></div>
-        <div><span class="text-gray-500">Kategorie</span><div>{{ $teilnehmer->Staatszugehörigkeit_Kategorie ?: '—' }}</div></div>
+        <div><span class="text-gray-500">Staatszugehörigkeit</span><div>{{ $teilnehmer->Staatszugehoerigkeit ?? $teilnehmer->Staatszugehörigkeit ?? '—' }}</div></div>
+        <div><span class="text-gray-500">Kategorie</span><div>{{ $teilnehmer->Staatszugehörigkeit_Kategorie ?? '—' }}</div></div>
         <div><span class="text-gray-500">Aufenthaltsstatus</span><div>{{ $teilnehmer->Aufenthaltsstatus ?: '—' }}</div></div>
 
         <div class="sm:col-span-2">
           <span class="text-gray-500">Gruppe</span>
           <div>
-            @if(!empty($gruppe))
-              {{ $gruppe->name }} (ID {{ $gruppe->gruppe_id }})
+            @if($teilnehmer->gruppe_id && $teilnehmer->gruppe)
+              {{ $teilnehmer->gruppe->name }} (ID {{ $teilnehmer->gruppe->gruppe_id }})
             @elseif(!empty($teilnehmer->gruppe_id))
               Gruppe #{{ $teilnehmer->gruppe_id }}
             @else
@@ -123,22 +123,22 @@
       <div class="bg-white rounded-xl shadow-sm p-5">
         <h3 class="font-semibold mb-3">Soziale Merkmale</h3>
         <dl class="text-sm space-y-2">
-          <div><dt class="text-gray-500">Minderheit</dt><dd>{{ $teilnehmer->Minderheit ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Behinderung</dt><dd>{{ $teilnehmer->Behinderung ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Obdachlos</dt><dd>{{ $teilnehmer->Obdachlos ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Ländliche Gebiete</dt><dd>{{ $teilnehmer->LändlicheGebiete ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Eltern im Ausland geboren</dt><dd>{{ $teilnehmer->ElternImAuslandGeboren ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Armutsbetroffen</dt><dd>{{ $teilnehmer->Armutsbetroffen ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Armutsgefährdet</dt><dd>{{ $teilnehmer->Armutsgefährdet ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Bildungshintergrund</dt><dd>{{ $teilnehmer->Bildungshintergrund ?? '—' }}</dd></div>
+          <div><dt class="text-gray-500">Minderheit</dt><dd>{{ $yesNo($teilnehmer->Minderheit) }}</dd></div>
+          <div><dt class="text-gray-500">Behinderung</dt><dd>{{ $yesNo($teilnehmer->Behinderung) }}</dd></div>
+          <div><dt class="text-gray-500">Obdachlos</dt><dd>{{ $yesNo($teilnehmer->Obdachlos) }}</dd></div>
+          <div><dt class="text-gray-500">Ländliche Gebiete</dt><dd>{{ $yesNo($teilnehmer->Laendliche_Gebiete ?? $teilnehmer->LaendlicheGebiete ?? null) }}</dd></div>
+          <div><dt class="text-gray-500">Eltern im Ausland geboren</dt><dd>{{ $yesNo($teilnehmer->Eltern_im_Ausland ?? $teilnehmer->ElternImAuslandGeboren ?? null) }}</dd></div>
+          <div><dt class="text-gray-500">Armutsbetroffen</dt><dd>{{ $yesNo($teilnehmer->Armutsbetroffen) }}</dd></div>
+          <div><dt class="text-gray-500">Armutsgefährdet</dt><dd>{{ $yesNo($teilnehmer->Armutsgefährdet) }}</dd></div>
+          <div><dt class="text-gray-500">Bildungshintergrund</dt><dd>{{ $teilnehmer->ISCED ?? $teilnehmer->Bildungshintergrund ?? '—' }}</dd></div>
         </dl>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm p-5">
         <h3 class="font-semibold mb-3">Unterlagen & Ziele</h3>
         <dl class="text-sm space-y-2">
-          <div><dt class="text-gray-500">IDEA Stammdatenblatt</dt><dd>{{ $teilnehmer->IDEA_Stammdatenblatt ? 'Ja' : 'Nein' }}</dd></div>
-          <div><dt class="text-gray-500">IDEA Dokumente</dt><dd>{{ $teilnehmer->IDEA_Dokumente ? 'Ja' : 'Nein' }}</dd></div>
+          <div><dt class="text-gray-500">IDEA Stammdatenblatt</dt><dd>{{ $yesNo($teilnehmer->IDEA_Stammdatenblatt) }}</dd></div>
+          <div><dt class="text-gray-500">IDEA Dokumente</dt><dd>{{ $yesNo($teilnehmer->IDEA_Dokumente) }}</dd></div>
           <div><dt class="text-gray-500">PAZ</dt><dd>{{ $teilnehmer->PAZ ?? '—' }}</dd></div>
         </dl>
       </div>
@@ -153,7 +153,7 @@
           <div><dt class="text-gray-500">Beginn</dt><dd>{{ $teilnehmer->Zeit_berufserfahrung ?? '—' }}</dd></div>
           <div><dt class="text-gray-500">Stundenumfang</dt><dd>{{ $teilnehmer->Stundenumfang_berufserfahrung ?? '—' }}</dd></div>
           <div><dt class="text-gray-500">Zertifikate</dt><dd>{{ $teilnehmer->Zertifikate ?? '—' }}</dd></div>
-          <div><dt class="text-gray-500">Clearing Gruppe</dt><dd>{{ $teilnehmer->Clearing_gruppe ? 'Ja' : 'Nein' }}</dd></div>
+          <div><dt class="text-gray-500">Clearing Gruppe</dt><dd>{{ $yesNo($teilnehmer->Clearing_gruppe) }}</dd></div>
           <div><dt class="text-gray-500">Berufswunsch</dt><dd>{{ $teilnehmer->Berufswunsch ?? '—' }}</dd></div>
           <div><dt class="text-gray-500">Branche</dt><dd>{{ $teilnehmer->Berufswunsch_branche ?? '—' }}</dd></div>
           <div><dt class="text-gray-500">Branche 2</dt><dd>{{ $teilnehmer->Berufswunsch_branche2 ?? '—' }}</dd></div>
@@ -163,183 +163,130 @@
       </div>
     </section>
 
+    {{-- Beratungen --}}
+    <section class="rounded-2xl border bg-white shadow">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h3 class="text-base font-semibold">Beratungen</h3>
+        @can('beratung.manage')
+          <a href="{{ route('beratungen.index', ['q' => $teilnehmer->Email ?? '']) }}"
+             class="text-sm px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+            Neue Beratung
+          </a>
+        @endcan
+      </div>
 
+      <div class="p-5">
+        <div class="overflow-x-auto">
+          <table class="w-full table-fixed border-collapse">
+            <thead>
+              <tr class="text-left text-sm text-gray-600">
+                <th class="w-28">Datum</th>
+                <th class="w-56">Art</th>
+                <th class="w-56">Thema</th>
+                <th class="w-40">Berater</th>
+                <th class="w-24 text-right">Dauer (h)</th>
+                <th class="w-32">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody class="align-top text-sm">
+              @foreach ($teilnehmer->beratungen as $b)
+                @php
+                  $bid = $b->beratung_id ?? $b->id ?? $b->getKey();
+                  $dateStr   = $b->datum ? \Illuminate\Support\Carbon::parse($b->datum)->format('d.m.Y') : '—';
+                  $artStr    = optional($b->art)->Bezeichnung ?? optional($b->art)->bezeichnung ?? '—';
+                  $themaStr  = optional($b->thema)->Bezeichnung ?? optional($b->thema)->bezeichnung ?? ($b->thema ?? '—');
+                  $beraterStr = trim((optional($b->mitarbeiter)->Nachname ?? '').' '.(optional($b->mitarbeiter)->Vorname ?? ''));
+                  if ($beraterStr === '') $beraterStr = '—';
+                  $dauerRaw = $b->dauer_h ?? $b->dauer_stunden ?? null;
+                  $dauerStr = is_null($dauerRaw) ? '—' : number_format((float)$dauerRaw, 2, ',', '.');
+                @endphp
 
-{{-- Beratungen (vollständige Liste, Notizen via Modal) --}}
-<section class="rounded-2xl border bg-white shadow">
-  <div class="px-5 py-4 border-b flex items-center justify-between">
-    <h3 class="text-base font-semibold">Beratungen</h3>
-    @can('beratung.manage')
-      <a href="{{ route('beratungen.index', ['q' => $teilnehmer->Email ?? '']) }}"
-         class="text-sm px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-        Neue Beratung
-      </a>
-    @endcan
-  </div>
-
-  <div class="p-5">
-    <div class="overflow-x-auto"> {{-- nur horizontal, kein vertical-scroll --}}
-      <table class="w-full table-fixed border-collapse">
-        <thead>
-          <tr class="text-left text-sm text-gray-600">
-            <th class="w-28">Datum</th>
-            <th class="w-56">Art</th>
-            <th class="w-56">Thema</th>
-            <th class="w-40">Berater</th>
-            <th class="w-24 text-right">Dauer (h)</th>
-            <th class="w-32">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody class="align-top text-sm">
-          {{-- deine Zeilen --}}
-
-          @foreach ($teilnehmer->beratungen as $b)
-            @php
-              // robustes ID-Feld
-              $bid = $b->beratung_id ?? $b->id ?? $b->getKey();
-
-              // Datum formatieren (falls kein Zeitanteil hinterlegt, bleibt nur Datum)
-              $dateStr = $b->datum
-                  ? \Illuminate\Support\Carbon::parse($b->datum)->format('d.m.Y')
-                  : '—';
-
-              // Art/Thema/ Berater über Relationen mit Fallbacks
-              $artStr   = optional($b->art)->Bezeichnung ?? optional($b->art)->bezeichnung ?? '—';
-              $themaStr = optional($b->thema)->Bezeichnung ?? optional($b->thema)->bezeichnung ?? ($b->thema ?? '—');
-              $beraterStr = trim(
-                (optional($b->mitarbeiter)->Nachname ?? '') . ' ' .
-                (optional($b->mitarbeiter)->Vorname ?? '')
-              );
-              if ($beraterStr === '') $beraterStr = '—';
-
-              // Dauer hübsch formatiert (deutsche Zahlform)
-              $dauerStr = is_null($b->dauer_h) ? '—' : number_format((float)$b->dauer_h, 2, ',', '.');
-            @endphp
-
-            <tr class="border-b last:border-b-0">
-              <td class="py-2 pr-3 align-top">{{ $dateStr }}</td>
-              <td class="py-2 pr-3 align-top">{{ $artStr }}</td>
-              <td class="py-2 pr-3 align-top">{{ $themaStr }}</td>
-              <td class="py-2 pr-3 align-top">{{ $beraterStr }}</td>
-              <td class="py-2 pr-3 align-top">{{ $dauerStr }}</td>
-              <td class="py-2 align-top">
-                <div class="flex gap-2">
-                  <button type="button"
-                          class="px-3 py-1 rounded border shadow text-sm"
-                          onclick="openNotizenModal(@js($b->notizen))">
-                    Notizen
-                  </button>
-
-                  @can('beratung.manage')
-                    <a href="{{ route('beratungen.edit', $bid) }}"
-                       class="px-3 py-1 rounded border shadow text-sm">
-                      Bearbeiten
-                    </a>
-                    <form method="POST" action="{{ route('beratungen.destroy', $bid) }}"
-                          onsubmit="return confirm('Diese Beratung wirklich löschen?');">
-                      @csrf @method('DELETE')
-                      <button class="px-3 py-1 rounded border shadow text-sm text-red-600">
-                        Löschen
+                <tr class="border-b last:border-b-0">
+                  <td class="py-2 pr-3 align-top">{{ $dateStr }}</td>
+                  <td class="py-2 pr-3 align-top">{{ $artStr }}</td>
+                  <td class="py-2 pr-3 align-top">{{ $themaStr }}</td>
+                  <td class="py-2 pr-3 align-top">{{ $beraterStr }}</td>
+                  <td class="py-2 pr-3 align-top text-right">{{ $dauerStr }}</td>
+                  <td class="py-2 align-top">
+                    <div class="flex gap-2">
+                      <button type="button"
+                              class="px-3 py-1 rounded border shadow text-sm"
+                              onclick="openNotizenModal(@js($b->notizen))">
+                        Notizen
                       </button>
-                    </form>
-                  @endcan
-                </div>
-              </td>
-            </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
 
+                      @can('beratung.manage')
+                        <a href="{{ route('beratungen.edit', $bid) }}"
+                           class="px-3 py-1 rounded border shadow text-sm">
+                          Bearbeiten
+                        </a>
+                        <form method="POST" action="{{ route('beratungen.destroy', $bid) }}"
+                              onsubmit="return confirm('Diese Beratung wirklich löschen?');">
+                          @csrf @method('DELETE')
+                          <button class="px-3 py-1 rounded border shadow text-sm text-red-600">
+                            Löschen
+                          </button>
+                        </form>
+                      @endcan
+                    </div>
+                  </td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     {{-- Kompetenzstand (Eintritt) --}}
-<h3 class="text-lg font-semibold mt-6 mb-2">Kompetenzstand (Eintritt)</h3>
-<table class="w-full text-sm">
-  <thead class="bg-gray-50">
-    <tr>
-      <th class="px-3 py-2">Kompetenz</th>
-      <th class="px-3 py-2">Niveau</th>
-      <th class="px-3 py-2">Datum</th>
-      <th class="px-3 py-2">Bemerkung</th>
-    </tr>
-  </thead>
-  <tbody>
-    @forelse($eintrittList as $r)
-      <tr class="border-t">
-        <td class="px-3 py-2">{{ $r->kcode ? ($r->kcode.' — ') : '' }}{{ $r->kbez }}</td>
-        <td class="px-3 py-2">{{ $r->ncode ? ($r->ncode.' — ') : '' }}{{ $r->nlabel }}</td>
-        <td class="px-3 py-2">
-          {{ $r->datum ? \Illuminate\Support\Carbon::parse($r->datum)->format('d.m.Y') : '—' }}
-        </td>
-        <td class="px-3 py-2">{{ $r->bemerkung ?: '—' }}</td>
-      </tr>
-    @empty
-      <tr><td colspan="4" class="px-3 py-3 text-gray-500">Keine Einträge.</td></tr>
-    @endforelse
-  </tbody>
-</table>
+    <h3 class="text-lg font-semibold mt-6 mb-2">Kompetenzstand (Eintritt)</h3>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Kompetenz</th>
+          <th class="px-3 py-2 text-left">Niveau</th>
+          <th class="px-3 py-2 text-left">Datum</th>
+          <th class="px-3 py-2 text-left">Bemerkung</th>
+        </tr>
+      </thead>
+      <tbody>
+        @forelse($eintrittList as $r)
+          <tr class="border-t">
+            <td class="px-3 py-2"><span class="font-semibold">{{ $r->kcode }}</span> — {{ $r->kbez }}</td>
+            <td class="px-3 py-2">{{ $r->ncode ? ($r->ncode.' — '.$r->nlabel) : '—' }}</td>
+            <td class="px-3 py-2">{{ $r->datum ? \Illuminate\Support\Carbon::parse($r->datum)->format('d.m.Y') : '—' }}</td>
+            <td class="px-3 py-2">{{ $r->bemerkung ?: '—' }}</td>
+          </tr>
+        @empty
+          <tr><td colspan="4" class="px-3 py-3 text-gray-500">Keine Einträge.</td></tr>
+        @endforelse
+      </tbody>
+    </table>
 
-
-
-{{-- Kompetenzstand (Austritt) --}}
-<section>
-<h3 class="text-lg font-semibold mt-6 mb-2">Kompetenzstand (Austritt)</h3>
-<table class="w-full text-sm">
-  <thead class="bg-gray-50">
-    <tr>
-      <th class="px-3 py-2">Kompetenz</th>
-      <th class="px-3 py-2">Niveau</th>
-      <th class="px-3 py-2">Datum</th>
-      <th class="px-3 py-2">Bemerkung</th>
-    </tr>
-  </thead>
-  <tbody>
-    @forelse($austrittList as $r)
-      <tr class="border-t">
-        <td class="px-3 py-2">{{ $r->kcode ? ($r->kcode.' — ') : '' }}{{ $r->kbez }}</td>
-        <td class="px-3 py-2">{{ $r->ncode ? ($r->ncode.' — ') : '' }}{{ $r->nlabel }}</td>
-        <td class="px-3 py-2">
-          {{ $r->datum ? \Illuminate\Support\Carbon::parse($r->datum)->format('d.m.Y') : '—' }}
-        </td>
-        <td class="px-3 py-2">{{ $r->bemerkung ?: '—' }}</td>
-      </tr>
-    @empty
-      <tr><td colspan="4" class="px-3 py-3 text-gray-500">Keine Einträge.</td></tr>
-    @endforelse
-  </tbody>
-</table>
-</section>
-
-
-{{-- Kleines Modal für Notizen (vanilla JS, keine Abhängigkeiten) --}}
-<div id="beratungNotizenModal"
-     class="hidden fixed inset-0 z-50 items-center justify-center">
-  <div class="absolute inset-0 bg-black/40" onclick="closeNotizenModal()"></div>
-  <div class="relative bg-white rounded-2xl shadow p-6 w-full max-w-xl mx-auto">
-    <h4 class="text-base font-semibold mb-3">Notizen</h4>
-    <div class="text-sm text-gray-800 whitespace-pre-wrap" data-content></div>
-    <div class="mt-5 flex justify-end">
-      <button class="px-3 py-2 rounded border shadow text-sm" onclick="closeNotizenModal()">Schließen</button>
-    </div>
-  </div>
-</div>
-
-<script>
-function openNotizenModal(text) {
-  const m = document.getElementById('beratungNotizenModal');
-  m.querySelector('[data-content]').textContent = (text && String(text).trim()) ? text : '—';
-  m.classList.remove('hidden');
-  m.classList.add('flex');
-}
-function closeNotizenModal() {
-  const m = document.getElementById('beratungNotizenModal');
-  m.classList.add('hidden');
-  m.classList.remove('flex');
-}
-</script>
-
+    {{-- Kompetenzstand (Austritt) --}}
+    <h3 class="text-lg font-semibold mt-6 mb-2">Kompetenzstand (Austritt)</h3>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Kompetenz</th>
+          <th class="px-3 py-2 text-left">Niveau</th>
+          <th class="px-3 py-2 text-left">Datum</th>
+          <th class="px-3 py-2 text-left">Bemerkung</th>
+        </tr>
+      </thead>
+      <tbody>
+        @forelse($austrittList as $r)
+          <tr class="border-t">
+            <td class="px-3 py-2"><span class="font-semibold">{{ $r->kcode }}</span> — {{ $r->kbez }}</td>
+            <td class="px-3 py-2">{{ $r->ncode ? ($r->ncode.' — '.$r->nlabel) : '—' }}</td>
+            <td class="px-3 py-2">{{ $r->datum ? \Illuminate\Support\Carbon::parse($r->datum)->format('d.m.Y') : '—' }}</td>
+            <td class="px-3 py-2">{{ $r->bemerkung ?: '—' }}</td>
+          </tr>
+        @empty
+          <tr><td colspan="4" class="px-3 py-3 text-gray-500">Keine Einträge.</td></tr>
+        @endforelse
+      </tbody>
+    </table>
 
     {{-- Anwesenheit mit Monat-Navigation --}}
     <section class="bg-white rounded-xl shadow-sm p-5">
@@ -384,39 +331,40 @@ function closeNotizenModal() {
       @endif
     </section>
 
-        {{-- Praktika --}}
+    {{-- Praktika --}}
     <section id="praktika" class="bg-white rounded-xl shadow-sm p-5">
-    <h2 class="text-lg font-semibold mb-3">Praktika</h2>
-    @if($teilnehmer->praktika->count())
+      <h2 class="text-lg font-semibold mb-3">Praktika</h2>
+      @if($teilnehmer->praktika->count())
         <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+          <table class="w-full text-sm">
             <thead class="bg-gray-50">
-            <tr>
+              <tr>
                 <th class="text-left px-2 py-1">Firma</th>
                 <th class="text-left px-2 py-1">Beginn</th>
                 <th class="text-left px-2 py-1">Ende</th>
                 <th class="text-left px-2 py-1">Std.</th>
                 <th class="text-left px-2 py-1">Anmerkung</th>
-            </tr>
+              </tr>
             </thead>
             <tbody>
-            @foreach($teilnehmer->praktika as $p)
+              @foreach($teilnehmer->praktika as $p)
                 <tr class="border-t">
-                <td class="px-2 py-1">{{ $p->firma ?? '—' }}</td>
-                <td class="px-2 py-1">{{ $fmt($p->beginn ?? ($p->beginn_datum ?? $p->von ?? null)) }}</td>
-                <td class="px-2 py-1">{{ $fmt($p->ende ?? ($p->ende_datum ?? $p->bis ?? null)) }}</td>
-                <td class="px-2 py-1">{{ $p->stunden_ausmass ?? '—' }}</td>
-                <td class="px-2 py-1">{{ $p->anmerkung ?? '—' }}</td>
+                  <td class="px-2 py-1">{{ $p->firma ?? '—' }}</td>
+                  <td class="px-2 py-1">{{ $fmt($p->beginn ?? ($p->beginn_datum ?? $p->von ?? null)) }}</td>
+                  <td class="px-2 py-1">{{ $fmt($p->ende ?? ($p->ende_datum ?? $p->bis ?? null)) }}</td>
+                  <td class="px-2 py-1">{{ $p->stunden_ausmass ?? '—' }}</td>
+                  <td class="px-2 py-1">{{ $p->anmerkung ?? '—' }}</td>
                 </tr>
-            @endforeach
+              @endforeach
             </tbody>
-        </table>
+          </table>
         </div>
-    @else
+      @else
         <p class="text-sm text-gray-500">Keine Praktika erfasst.</p>
-    @endif
+      @endif
     </section>
-    {{-- Dokumente (Uploads des TN) --}}
+
+    {{-- Dokumente --}}
     <section class="bg-white rounded-xl shadow-sm p-5">
       <h2 class="text-lg font-semibold mb-3">Dokumente</h2>
       @if($teilnehmer->dokumente->count())
@@ -431,44 +379,36 @@ function closeNotizenModal() {
               </tr>
             </thead>
             <tbody>
-            @foreach($teilnehmer->dokumente as $d)
-              <tr class="border-t">
-                <td class="px-2 py-1">{{ $fmt($d->hochgeladen_am) }}</td>
-                <td class="px-2 py-1">{{ $d->typ ?? '—' }}</td>
-                <td class="px-2 py-1">{{ $d->original_name ?? '—' }}</td>
-                <td class="px-2 py-1">
-                  @if(Route::has('teilnehmer_dokumente.download'))
-                    <a class="text-blue-600 hover:underline"
-                       href="{{ route('teilnehmer_dokumente.download', $d->getKey()) }}">Download</a>
-                  @elseif(Route::has('teilnehmer_dokumente.show'))
-                    <a class="text-blue-600 hover:underline"
-                       href="{{ route('teilnehmer_dokumente.show', $d->getKey()) }}">Anzeigen</a>
-                  @else
-                    —
-                  @endif
-                </td>
-              </tr>
-            @endforeach
+              @foreach($teilnehmer->dokumente as $d)
+                <tr class="border-t">
+                  <td class="px-2 py-1">{{ $fmt($d->hochgeladen_am ?? $d->created_at) }}</td>
+                  <td class="px-2 py-1">{{ $d->typ ?? '—' }}</td>
+                  <td class="px-2 py-1">{{ $d->original_name ?? '—' }}</td>
+                  <td class="px-2 py-1">
+                    @if(Route::has('teilnehmer_dokumente.download'))
+                      <a class="text-blue-600 hover:underline"
+                         href="{{ route('teilnehmer_dokumente.download', $d->getKey()) }}">Download</a>
+                    @elseif(Route::has('teilnehmer_dokumente.show'))
+                      <a class="text-blue-600 hover:underline"
+                         href="{{ route('teilnehmer_dokumente.show', $d->getKey()) }}">Anzeigen</a>
+                    @else
+                      —
+                    @endif
+                  </td>
+                </tr>
+              @endforeach
             </tbody>
           </table>
         </div>
       @else
         <p class="text-sm text-gray-500">Keine Dokumente hochgeladen.</p>
       @endif
-
-
-
     </section>
 
   </div>
 
-
-
-
   {{-- Rechte Spalte --}}
   <aside class="lg:col-span-5 space-y-6">
-
-
 
     {{-- Checkliste kompakt --}}
     <div class="bg-white rounded-xl shadow-sm p-5">
@@ -483,7 +423,7 @@ function closeNotizenModal() {
         <dl class="text-sm grid grid-cols-2 gap-x-6 gap-y-2">
           <div><dt class="text-gray-500">AMS Bericht</dt><dd>{{ $teilnehmer->checkliste->ams_bericht ?? '—' }}</dd></div>
           <div><dt class="text-gray-500">AMS Lebenslauf</dt><dd>{{ $teilnehmer->checkliste->ams_lebenslauf ?? '—' }}</dd></div>
-          {{-- hier gern weitere Felder ergänzen --}}
+          {{-- weitere Felder hier --}}
         </dl>
       @else
         <p class="text-gray-500 text-sm">Keine Checkliste vorhanden.</p>
@@ -495,7 +435,6 @@ function closeNotizenModal() {
       <h2 class="text-lg font-semibold mb-3">Aktionen</h2>
       <div class="flex flex-wrap gap-2">
         <a href="{{ route('teilnehmer.edit', $tnId) }}" class="px-3 py-2 border rounded-lg hover:bg-gray-50">Bearbeiten</a>
-
         @php $firstDocTpl = $docs->first(); @endphp
         @if($firstDocTpl && Route::has('dokumente.prepare'))
           <a href="{{ route('dokumente.prepare', ['teilnehmer'=>$tnId, 'dokument'=>$firstDocTpl->getKey()]) }}"
@@ -503,33 +442,35 @@ function closeNotizenModal() {
         @endif
       </div>
     </div>
+
+    {{-- Audit --}}
+    <div class="bg-white rounded-xl shadow-sm p-5">
+      @include('partials.audit', ['model' => $teilnehmer])
+    </div>
   </aside>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-5">
-        <div class="flex items-center justify-between mb-3">
-           @include('partials.audit', ['model' => $teilnehmer])
-        </div>
+{{-- Notizen Modal (JS im Content halten) --}}
+<div id="beratungNotizenModal" class="hidden fixed inset-0 z-50 items-center justify-center">
+  <div class="absolute inset-0 bg-black/40" onclick="closeNotizenModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow p-6 w-full max-w-xl mx-auto">
+    <h4 class="text-base font-semibold mb-3">Notizen</h4>
+    <div class="text-sm text-gray-800 whitespace-pre-wrap" data-content></div>
+    <div class="mt-5 flex justify-end">
+      <button class="px-3 py-2 rounded border shadow text-sm" onclick="closeNotizenModal()">Schließen</button>
     </div>
+  </div>
 </div>
 
-
-<div>
-
-</div>
-
-@endsection
 <script>
-  function toggleModal(id) {
-    const modal = document.getElementById(id);
-    if (modal.classList.contains('hidden')) {
-      modal.classList.remove('hidden');
-    } else {
-      modal.classList.add('hidden');
-    }
-  }
+function openNotizenModal(text) {
+  const m = document.getElementById('beratungNotizenModal');
+  m.querySelector('[data-content]').textContent = (text && String(text).trim()) ? text : '—';
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeNotizenModal() {
+  const m = document.getElementById('beratungNotizenModal');
+  m.classList.add('hidden'); m.classList.remove('flex');
+}
 </script>
-
-
-
-
+@endsection

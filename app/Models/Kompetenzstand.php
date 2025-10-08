@@ -3,46 +3,39 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
-
 
 class Kompetenzstand extends Model
 {
     protected $table = 'kompetenzstand';
-    protected $fillable = ['teilnehmer_id','kompetenz_id','niveau_id','zeitpunkt','datum','bemerkung'];
 
-    // Mutator: beim Speichern normalisieren
-    public function setZeitpunktAttribute($value)
+    // WICHTIG: Tabelle hat keinen PK & keine Timestamps
+    protected $primaryKey = null;
+    public $incrementing = false;
+    public $timestamps = false;
+
+    protected $fillable = [
+        'teilnehmer_id',
+        'kompetenz_id',
+        'niveau_id',
+        'zeitpunkt',
+        'zeitpunkt_norm',
+        'datum',
+        'bemerkung',
+    ];
+
+    // Relations (Teilnehmer-PK = Teilnehmer_id)
+    public function teilnehmer()
     {
-        $norm = strtolower(trim((string)$value));
-        // akzeptiere Varianten
-        $map = ['eintritt' => 'eintritt', 'austritt' => 'austritt'];
-        $this->attributes['zeitpunkt'] = $map[$norm] ?? $norm;
+        return $this->belongsTo(\App\Models\Teilnehmer::class, 'teilnehmer_id', 'Teilnehmer_id');
     }
 
-    // Accessor: sicheres, genormtes Feld
-    public function getZeitpunktNormAttribute(): string
+    public function kompetenz()
     {
-        return strtolower(trim((string)($this->attributes['zeitpunkt'] ?? '')));
+        return $this->belongsTo(\App\Models\Kompetenz::class, 'kompetenz_id', 'kompetenz_id');
     }
 
-
-
-
-    // Scopes
-        public function scopeEintritt(Builder $q): Builder
+    public function niveau()
     {
-        return Schema::hasColumn('kompetenzstand', 'zeitpunkt_norm')
-            ? $q->where('zeitpunkt_norm', 'eintritt')
-            : $q->whereRaw('LOWER(TRIM(zeitpunkt)) = ?', ['eintritt']);
+        return $this->belongsTo(\App\Models\Niveau::class, 'niveau_id', 'niveau_id');
     }
-
-    public function scopeAustritt(Builder $q): Builder
-    {
-        return Schema::hasColumn('kompetenzstand', 'zeitpunkt_norm')
-            ? $q->where('zeitpunkt_norm', 'austritt')
-            : $q->whereRaw('LOWER(TRIM(zeitpunkt)) = ?', ['austritt']);
-    }
-
 }

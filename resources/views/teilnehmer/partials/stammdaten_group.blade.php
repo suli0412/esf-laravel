@@ -101,7 +101,7 @@
     ->join('kompetenzen as k','k.kompetenz_id','=','ks.kompetenz_id')
     ->join('niveau as n','n.niveau_id','=','ks.niveau_id')
     ->where('ks.teilnehmer_id',$teilnehmer->Teilnehmer_id)
-    ->where('ks.zeitpunkt','Eintritt')
+    ->where('ks.zeitpunkt_norm','eintritt')
     ->orderBy('k.code')
     ->select('k.code as kcode','k.bezeichnung as kbez','n.code as ncode','n.label as nlabel','ks.datum','ks.bemerkung')
     ->get();
@@ -110,7 +110,7 @@
     ->join('kompetenzen as k','k.kompetenz_id','=','ks.kompetenz_id')
     ->join('niveau as n','n.niveau_id','=','ks.niveau_id')
     ->where('ks.teilnehmer_id',$teilnehmer->Teilnehmer_id)
-    ->where('ks.zeitpunkt','Austritt')
+    ->where('ks.zeitpunkt_norm','austritt')
     ->orderBy('k.code')
     ->select('k.code as kcode','k.bezeichnung as kbez','n.code as ncode','n.label as nlabel','ks.datum','ks.bemerkung')
     ->get();

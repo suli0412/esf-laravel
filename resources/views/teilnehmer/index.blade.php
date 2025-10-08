@@ -13,6 +13,7 @@
          class="px-3 py-2 rounded border {{ $view==='table'?'bg-gray-900 text-white':'bg-white' }}">
         Tabelle
       </a>
+
       <a href="{{ route('teilnehmer.index', array_merge($qs, ['view'=>'cards'])) }}"
          class="px-3 py-2 rounded border {{ $view==='cards'?'bg-gray-900 text-white':'bg-white' }}">
         Karten
@@ -27,8 +28,9 @@
         class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3 bg-white p-3 rounded-xl shadow-sm">
 
     <div class="col-span-2">
-      <label class="block text-sm text-gray-600 mb-1">Suche (Name/Email/Tel.)</label>
-      <input name="q" value="{{ $q }}" class="w-full border rounded px-3 py-2" placeholder="z. B. Müller oder mueller@...">
+      <label class="block text-sm text-gray-600 mb-1">Suche (Name/ESFNummer)</label>
+      <input name="q" value="{{ $q }}" class="w-full border rounded px-3 py-2" placeholder="z. B. Müller, Alina · #40 · 40"
+>
     </div>
 
     <div>
@@ -142,11 +144,7 @@
       <thead class="bg-gray-50 sticky top-0">
         <tr class="text-sm text-gray-600">
           <th class="px-3 py-2">Name</th>
-          <th class="px-3 py-2">Kontakt</th>
           <th class="px-3 py-2">Gruppe</th>
-          <th class="px-3 py-2">DE</th>
-          <th class="px-3 py-2">EN</th>
-          <th class="px-3 py-2">MA</th>
           <th class="px-3 py-2 text-right">Dok</th>
           <th class="px-3 py-2 text-right">Prak</th>
           <th class="px-3 py-2">Aktionen</th>
@@ -164,10 +162,7 @@
                 geändert {{ optional($t->updated_at)->format('d.m.Y') }}
               </div>
             </td>
-            <td class="px-3 py-2 text-sm">
-              <div>{{ $t->Email ?? '—' }}</div>
-              <div class="text-gray-500">{{ $t->Telefonnummer ?? '—' }}</div>
-            </td>
+
             <td class="px-3 py-2">
               @if($t->gruppe_id)
                 <span class="inline-flex items-center text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -177,9 +172,6 @@
                 <span class="inline-flex items-center text-xs px-2 py-1 rounded-full bg-gray-50 text-gray-700 border">—</span>
               @endif
             </td>
-            <td class="px-3 py-2 text-sm">{{ $pick($t,'de_sprechen_out','de_sprechen_in') }}</td>
-            <td class="px-3 py-2 text-sm">{{ $pick($t,'en_out','en_in') }}</td>
-            <td class="px-3 py-2 text-sm">{{ $pick($t,'ma_out','ma_in') }}</td>
             <td class="px-3 py-2 text-right">{{ $t->dokumente_count }}</td>
             <td class="px-3 py-2 text-right">{{ $t->praktika_count }}</td>
             <td class="px-3 py-2">
